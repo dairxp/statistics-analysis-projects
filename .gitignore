@@ -7,6 +7,9 @@
 renv/
 renv.lock
 
+# Shiny deployment files
+rsconnect/
+
 # Python environments
 venv/
 env/
