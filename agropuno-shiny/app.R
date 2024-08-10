@@ -12,11 +12,13 @@ library(imputeTS)
 generarHistograma <- function(data, variable) {
   filtered_data <- data %>%
     filter(VARIABLE == variable) %>%
-    select(-VARIABLE)
+    select(matches("^\\d{4}$"))
+  
+  total_por_anio <- colSums(filtered_data, na.rm = TRUE)
   
   production_data <- data.frame(
-    YEAR = as.numeric(colnames(filtered_data)),
-    TOTAL = as.numeric(unlist(filtered_data))
+    YEAR = as.numeric(names(total_por_anio)),
+    TOTAL = as.numeric(total_por_anio)
   )
   
   hist_data <- hist(production_data$TOTAL, plot = FALSE)
@@ -54,11 +56,13 @@ generarHistograma <- function(data, variable) {
 generarMensajeNormalidad <- function(data, variable) {
   filtered_data <- data %>%
     filter(VARIABLE == variable) %>%
-    select(-VARIABLE)
+    select(matches("^\\d{4}$"))
+  
+  total_por_anio <- colSums(filtered_data, na.rm = TRUE)
   
   production_data <- data.frame(
-    YEAR = as.numeric(colnames(filtered_data)),
-    TOTAL = as.numeric(unlist(filtered_data))
+    YEAR = as.numeric(names(total_por_anio)),
+    TOTAL = as.numeric(total_por_anio)
   )
   
   # Comprobar si los datos siguen una distribución normal
@@ -77,11 +81,13 @@ generarMensajeNormalidad <- function(data, variable) {
 generarBoxPlot <- function(data, variable) {
   filtered_data <- data %>%
     filter(VARIABLE == variable) %>%
-    select(-VARIABLE)
+    select(matches("^\\d{4}$"))
+  
+  total_por_anio <- colSums(filtered_data, na.rm = TRUE)
   
   production_data <- data.frame(
-    YEAR = as.numeric(colnames(filtered_data)),
-    TOTAL = as.numeric(unlist(filtered_data))
+    YEAR = as.numeric(names(total_por_anio)),
+    TOTAL = as.numeric(total_por_anio)
   )
   
   plot_ly(production_data, y = ~TOTAL, type = 'box',
@@ -93,62 +99,84 @@ generarBoxPlot <- function(data, variable) {
 }
 
 prueba_t <- function(grupo1, grupo2) {
-  result <- t.test(grupo1, grupo2)
+  grupo1 <- na.omit(as.numeric(grupo1))
+  grupo2 <- na.omit(as.numeric(grupo2))
+  
+  if(length(grupo1) < 3 || length(grupo2) < 3) {
+      return(list(
+          nombre_prueba = "Error", estadistico = NA, valor_p = NA,
+          intervalo_confianza = c(NA, NA),
+          mensaje = "No hay suficientes datos (mínimo 3) para realizar la prueba."
+      ))
+  }
+  
+  norm1 <- shapiro.test(grupo1)$p.value > 0.05
+  norm2 <- shapiro.test(grupo2)$p.value > 0.05
+  
+  if (norm1 && norm2) {
+    result <- t.test(grupo1, grupo2)
+    nombre_prueba <- "Prueba T de Student (Paramétrica)"
+  } else {
+    result <- suppressWarnings(wilcox.test(grupo1, grupo2, conf.int = TRUE, exact = FALSE))
+    nombre_prueba <- "Prueba U de Mann-Whitney (No Paramétrica)"
+  }
+  
   resultado <- list(
-    estadistico_t = result$statistic,
+    nombre_prueba = nombre_prueba,
+    estadistico = result$statistic,
     valor_p = result$p.value,
-    intervalo_confianza = result$conf.int,
-    hay_evidencia = result$p.value < 0.05,
-    medias_diferentes = result$p.value < 0.05,
-    mensaje1 = ifelse(result$p.value < 0.05, "Hay evidencia estadística para rechazar la hipótesis nula. Las medias son significativamente diferentes.", "No hay suficiente evidencia estadística para rechazar la hipótesis nula. Las medias no son significativamente diferentes.")
+    intervalo_confianza = if(is.null(result$conf.int)) c(NA, NA) else result$conf.int,
+    mensaje = ifelse(result$p.value < 0.05, 
+                     paste(nombre_prueba, "- Hay evidencia para rechazar la hipótesis nula. Las diferencias son significativas."), 
+                     paste(nombre_prueba, "- No hay suficiente evidencia. No hay diferencias significativas."))
   )
   
   return(resultado)
 }
 
-# Define la función para evaluar la correlación de Pearson y generar el gráfico
-evaluar_correlacion_pearson <- function(data) {
-  # Convertir a tipo numérico
-  variable1 <- as.numeric(data[, "Siembra"])
-  variable2 <- as.numeric(data[, "Produccion"])
+evaluar_correlacion <- function(data) {
+  variable1 <- na.omit(as.numeric(data[, "Siembra"]))
+  variable2 <- na.omit(as.numeric(data[, "Produccion"]))
   
-  # Verificar si los datos son numéricos
-  if (any(is.na(variable1)) || any(is.na(variable2))) {
-    return("Los datos seleccionados contienen valores no numéricos.")
+  if(length(variable1) < 3 || length(variable2) < 3) {
+    return("No hay suficientes datos numéricos válidos para calcular la correlación.")
   }
   
-  # Calcula la correlación de Pearson
-  correlacion <- cor(variable1, variable2)
+  if(sd(variable1) == 0 || sd(variable2) == 0) {
+    plot(variable1, variable2, main = "Datos Constantes", xlab = "Siembra", ylab = "Producción", pch = 16)
+    return("Una de las variables es constante (no tiene variación). No se puede calcular la correlación.")
+  }
   
-  # Calcula el tamaño de la muestra para ambas variables
-  n1 <- length(variable1)
-  n2 <- length(variable2)
+  norm1 <- shapiro.test(variable1)$p.value > 0.05
+  norm2 <- shapiro.test(variable2)$p.value > 0.05
   
-  # Toma el mínimo entre los dos tamaños de muestra
-  n <- min(n1, n2)
-  
-  # Calcula el valor crítico de la correlación de Pearson para un nivel de significancia del 0.05
-  critical_value <- qt(0.975, df = n - 2)
-  
-  # Calcula el intervalo de confianza
-  confidence_interval <- c(correlacion - critical_value / sqrt(n - 2), correlacion + critical_value / sqrt(n - 2))
-  
-  # Comprueba si el intervalo de confianza incluye el valor cero
-  if (confidence_interval[1] <= 0 && confidence_interval[2] >= 0) {
-    mensaje <- "Correlación Pearson: No hay evidencia suficiente para afirmar una relación significativa."
+  if (norm1 && norm2) {
+    metodo <- "pearson"
+    nombre_metodo <- "Pearson (Paramétrica)"
   } else {
-    mensaje <- "Correlación Pearson: Hay evidencia suficiente para afirmar una relación significativa."
+    metodo <- "spearman"
+    nombre_metodo <- "Spearman (No Paramétrica)"
   }
   
-  # Genera un gráfico de dispersión con línea de tendencia
-  plot(variable1, variable2, main = "", xlab = "Variable de Siembra", ylab = "Variable de Producción")
-  abline(lm(variable2 ~ variable1), col = "red")
+  test_result <- suppressWarnings(cor.test(variable1, variable2, method = metodo))
   
-  # Devuelve la evaluación de la correlación
+  if (test_result$p.value < 0.05) {
+    mensaje <- paste("Correlación", nombre_metodo, ": Hay evidencia para afirmar una relación significativa (p < 0.05). rho/r =", round(test_result$estimate, 3))
+  } else {
+    mensaje <- paste("Correlación", nombre_metodo, ": No hay evidencia suficiente para afirmar una relación significativa. rho/r =", round(test_result$estimate, 3))
+  }
+  
+  plot(variable1, variable2, main = paste("Dispersión -", nombre_metodo), xlab = "Siembra", ylab = "Producción", pch = 16, col="blue")
+  abline(lm(variable2 ~ variable1), col = "red", lwd=2)
+  
   return(mensaje)
 }
 
 Agrodata <- read_excel("Agrodata.xlsx")
+year_cols <- grep("^\\d{4}$", colnames(Agrodata))
+if(length(year_cols) > 0) {
+  Agrodata$TOTAL <- rowSums(Agrodata[, year_cols], na.rm = TRUE)
+}
 
 data <- Agrodata
 
@@ -211,7 +239,7 @@ ui <- shinyUI(
                    tags$div(class = "home-sci",
                             tags$a(href = "https://www.facebook.com/becam.chani.1", tags$i(class = "bx bxl-facebook-circle")),
                             tags$a(href = "https://forms.gle/YH6MXijjuEPW4WSw7", tags$i(class = "bx bx-envelope")),
-                            tags$a(href = "https://www.linkedin.com/in/alenm-jmade-68a186257/", tags$i(class = "bx bxl-linkedin")),
+                            tags$a(href = "https://www.linkedin.com/in/aldair-maquera-andrade", tags$i(class = "bx bxl-linkedin")),
                    ),
                    tags$div(class = "home-imgHover")
       ),
@@ -243,8 +271,8 @@ ui <- shinyUI(
                                                               selected = unique(data$PROCESO)[1]),
                                                   
                                                   selectInput("province", "Selecciona la provincia:",
-                                                              choices = unique(data$PROVINCIA),
-                                                              multiple = TRUE),
+                                                              choices = c("Todas", unique(data$PROVINCIA)),
+                                                              selected = "Todas"),
                                                   
                                                   selectInput("year", "Selecciona el año:",
                                                               choices = colnames(data)[-c(1:4)],
@@ -361,7 +389,7 @@ ui <- shinyUI(
                                   selected = unique(Agrodata$VARIABLE[Agrodata$PROCESO == "Siembra"])[1]
                                 ),
                                 selectInput(
-                                  inputId = "siembrapear",
+                                  inputId = "produccionpear",
                                   label = "Seleccionar variable de Producción",
                                   choices = unique(Agrodata$VARIABLE[Agrodata$PROCESO == "Cosecha"]),
                                   selected = unique(Agrodata$VARIABLE[Agrodata$PROCESO == "Cosecha"])[1]
@@ -389,11 +417,8 @@ ui <- shinyUI(
                             sidebarLayout(
                               sidebarPanel(
                                 # Dropdown para seleccionar la variable agronómica
-                                selectInput("variable3", "Seleccione la Variable:",
-                                            choices = unique(Agrodata$VARIABLE)),
-                                # Dropdown para seleccionar el año
-                                selectInput("anio", "Seleccione el Año:",
-                                            choices = colnames(Agrodata)[5:30])
+                                selectInput("variable3", "Seleccione el Cultivo para Análisis de Tendencia:",
+                                            choices = unique(Agrodata$VARIABLE))
                               ),
                               mainPanel(
                                 # Gráfico
@@ -415,7 +440,11 @@ ui <- shinyUI(
 
 server <- shinyServer(function(input, output) {
   filteredData <- reactive({
-    subset(data, PROVINCIA %in% input$province & PROCESO == input$process)
+    if ("Todas" %in% input$province) {
+      subset(data, PROCESO == input$process)
+    } else {
+      subset(data, PROVINCIA %in% input$province & PROCESO == input$process)
+    }
   })
   
   output$title <- renderText({
@@ -436,63 +465,47 @@ server <- shinyServer(function(input, output) {
   output$graficoBarrasVARIABLE <- renderPlotly({
     datos_agrupados <- data %>%
       group_by(VARIABLE) %>%
-      summarize(Produccion_Total = sum(TOTAL)) %>%
+      summarize(Produccion_Total = sum(TOTAL, na.rm = TRUE)) %>%
       arrange(desc(Produccion_Total))
     
-    p <- ggplot(datos_agrupados, aes(x = VARIABLE, y = Produccion_Total, fill = VARIABLE)) +
-      geom_bar(stat = "identity") +
-      labs(x = "VARIABLE", y = "Total", fill = "VARIABLE", title = "Total por VARIABLE") +
-      theme(axis.text.x = element_text(angle = 90, hjust = 1))
-    
-    ggplotly(p) 
+    plot_ly(datos_agrupados, x = ~VARIABLE, y = ~Produccion_Total, type = 'bar', color = ~VARIABLE) %>%
+      layout(title = "Total por VARIABLE", xaxis = list(title = "VARIABLE", tickangle = -45, categoryorder = "total descending"), yaxis = list(title = "Total"), showlegend = FALSE)
   })
   
   output$graficoBarrasPROVINCIA <- renderPlotly({
     datos_agrupados <- data %>%
       group_by(PROVINCIA) %>%
-      summarize(Produccion_Total = sum(TOTAL)) %>%
+      summarize(Produccion_Total = sum(TOTAL, na.rm = TRUE)) %>%
       arrange(desc(Produccion_Total))
     
-    p <- ggplot(datos_agrupados, aes(x = PROVINCIA, y = Produccion_Total, fill = PROVINCIA)) +
-      geom_bar(stat = "identity") +
-      labs(x = "PROVINCIA", y = "Total", fill = "PROVINCIA", title = "Total por PROVINCIA") +
-      theme(axis.text.x = element_text(angle = 90, hjust = 1))
-    
-    ggplotly(p)
+    plot_ly(datos_agrupados, x = ~PROVINCIA, y = ~Produccion_Total, type = 'bar', color = ~PROVINCIA) %>%
+      layout(title = "Total por PROVINCIA", xaxis = list(title = "PROVINCIA", tickangle = -45, categoryorder = "total descending"), yaxis = list(title = "Total"), showlegend = FALSE)
   })
   
   output$graficoBarrasPROCESO <- renderPlotly({
     datos_agrupados <- data %>%
       group_by(PROCESO) %>%
-      summarize(Produccion_Total = sum(TOTAL)) %>%
+      summarize(Produccion_Total = sum(TOTAL, na.rm = TRUE)) %>%
       arrange(desc(Produccion_Total))
     
-    p <- ggplot(datos_agrupados, aes(x = PROCESO, y = Produccion_Total, fill = PROCESO)) +
-      geom_bar(stat = "identity") +
-      labs(x = "PROCESO", y = "Total", fill = "PROCESO", title = "Total por PROCESO") +
-      theme(axis.text.x = element_text(angle = 90, hjust = 1))
-    
-    ggplotly(p)
+    plot_ly(datos_agrupados, x = ~PROCESO, y = ~Produccion_Total, type = 'bar', color = ~PROCESO) %>%
+      layout(title = "Total por PROCESO", xaxis = list(title = "PROCESO", tickangle = -45, categoryorder = "total descending"), yaxis = list(title = "Total"), showlegend = FALSE)
   })
   
   output$graficoBarrasUnidad <- renderPlotly({
     datos_agrupados <- data %>%
       group_by(`Unidad de medida`) %>%
-      summarize(Produccion_Total = sum(TOTAL)) %>%
+      summarize(Produccion_Total = sum(TOTAL, na.rm = TRUE)) %>%
       arrange(desc(Produccion_Total))
     
-    p <- ggplot(datos_agrupados, aes(x = `Unidad de medida`, y = Produccion_Total, fill = `Unidad de medida`)) +
-      geom_bar(stat = "identity") +
-      labs(x = "Unidad de medida", y = "Total", fill = "Unidad de medida", title = "Total por Unidad de medida") +
-      theme(axis.text.x = element_text(angle = 90, hjust = 1))
-    
-    ggplotly(p) 
+    plot_ly(datos_agrupados, x = ~`Unidad de medida`, y = ~Produccion_Total, type = 'bar', color = ~`Unidad de medida`) %>%
+      layout(title = "Total por Unidad de medida", xaxis = list(title = "Unidad de medida", tickangle = -45, categoryorder = "total descending"), yaxis = list(title = "Total"), showlegend = FALSE)
   })
   
   output$graficoCircularVARIABLE <- renderPlotly({
     datos_agrupados <- data %>%
       group_by(VARIABLE) %>%
-      summarize(Produccion_Total = sum(TOTAL)) %>%
+      summarize(Produccion_Total = sum(TOTAL, na.rm = TRUE)) %>%
       arrange(desc(Produccion_Total))
     
     p <- plot_ly(datos_agrupados, labels = ~VARIABLE, values = ~Produccion_Total, type = "pie") %>%
@@ -504,7 +517,7 @@ server <- shinyServer(function(input, output) {
   output$graficoCircularPROVINCIA <- renderPlotly({
     datos_agrupados <- data %>%
       group_by(PROVINCIA) %>%
-      summarize(Produccion_Total = sum(TOTAL)) %>%
+      summarize(Produccion_Total = sum(TOTAL, na.rm = TRUE)) %>%
       arrange(desc(Produccion_Total))
     
     p <- plot_ly(datos_agrupados, labels = ~PROVINCIA, values = ~Produccion_Total, type = "pie") %>%
@@ -516,7 +529,7 @@ server <- shinyServer(function(input, output) {
   output$graficoCircularPROCESO <- renderPlotly({
     datos_agrupados <- data %>%
       group_by(PROCESO) %>%
-      summarize(Produccion_Total = sum(TOTAL)) %>%
+      summarize(Produccion_Total = sum(TOTAL, na.rm = TRUE)) %>%
       arrange(desc(Produccion_Total))
     
     p <- plot_ly(datos_agrupados, labels = ~PROCESO, values = ~Produccion_Total, type = "pie") %>%
@@ -528,7 +541,7 @@ server <- shinyServer(function(input, output) {
   output$graficoCircularUnidad <- renderPlotly({
     datos_agrupados <- data %>%
       group_by(`Unidad de medida`) %>%
-      summarize(Produccion_Total = sum(TOTAL)) %>%
+      summarize(Produccion_Total = sum(TOTAL, na.rm = TRUE)) %>%
       arrange(desc(Produccion_Total))
     
     p <- plot_ly(datos_agrupados, labels = ~`Unidad de medida`, values = ~Produccion_Total, type = "pie") %>%
@@ -624,7 +637,8 @@ server <- shinyServer(function(input, output) {
       variable2 <- Agrodata[[input$year2]]
       
       resultados <- prueba_t(variable1, variable2)
-      cat("Estadístico t:", resultados$estadistico_t, "\n")
+      cat("Prueba aplicada:", resultados$nombre_prueba, "\n")
+      cat("Estadístico:", resultados$estadistico, "\n")
       cat("Valor p:", resultados$valor_p, "\n")
       cat("Intervalo de confianza:", resultados$intervalo_confianza, "\n")
     }
@@ -642,9 +656,14 @@ server <- shinyServer(function(input, output) {
   
   filtered_data <- eventReactive(input$filtrar, {
     data <- Agrodata
-    data_siembra <- data[data$VARIABLE == input$siembrapear & data$PROCESO == "Siembra", ]
-    data_produccion <- data[data$VARIABLE == input$siembrapear & data$PROCESO == "Cosecha", ]
-    data_filtered <- data.frame(Siembra = unlist(data_siembra[, 5:ncol(data_siembra)]), Produccion = unlist(data_produccion[, 5:ncol(data_produccion)]))
+    data_siembra <- data[data$VARIABLE == input$siembrapear & grepl("Siembra", data$PROCESO, ignore.case = TRUE), ]
+    data_produccion <- data[data$VARIABLE == input$produccionpear & grepl("Producci", data$PROCESO, ignore.case = TRUE), ]
+    
+    year_cols_s <- grep("^\\d{4}$", colnames(data_siembra))
+    year_cols_p <- grep("^\\d{4}$", colnames(data_produccion))
+    
+    data_filtered <- data.frame(Siembra = as.numeric(unlist(data_siembra[, year_cols_s])), 
+                                Produccion = as.numeric(unlist(data_produccion[, year_cols_p])))
     data_filtered
   })
   
@@ -655,7 +674,7 @@ server <- shinyServer(function(input, output) {
       plot(0, 0, xlim = c(0, 1), ylim = c(0, 1), type = "n", xlab = "Variable de Siembra", ylab = "Variable de Producción",
            main = "No hay suficientes datos para graficar y calcular la correlación")
     } else {
-      evaluar_correlacion_pearson(data)
+      evaluar_correlacion(data)
     }
   })
   
@@ -665,7 +684,7 @@ server <- shinyServer(function(input, output) {
     if (is.null(data) || nrow(data) < 2) {
       "No hay suficientes datos para calcular la correlación"
     } else {
-      evaluar_correlacion_pearson(data)
+      evaluar_correlacion(data)
     }
   })
   
@@ -704,57 +723,65 @@ server <- shinyServer(function(input, output) {
     }
   })
   
-  # Función para ajustar el modelo lineal y obtener el resumen
-  obtener_resumen_modelo <- function(datos_variable3, anio) {
-    modelo <- lm(as.formula(paste0("`", anio, "`", " ~ 1")), data = datos_variable3)
-    return(summary(modelo))
-  }
-  
-  # Observador reactivo para actualizar el gráfico y la salida al cambiar la variable o el año seleccionado
+  # Observador reactivo para actualizar el gráfico y la salida al cambiar la variable seleccionada
   output$grafico1 <- renderPlot({
-    # Filtrar los datos para la variable y el año seleccionado
-    datos_variable3 <- Agrodata %>% filter(VARIABLE == input$variable3)
+    datos_variable3 <- Agrodata %>% filter(VARIABLE == input$variable3 & grepl("Producci", PROCESO, ignore.case = TRUE))
+    year_cols <- grep("^\\d{4}$", colnames(datos_variable3), value = TRUE)
     
-    # Ajustar el modelo lineal
-    modelo <- lm(as.formula(paste0("TOTAL ~ `", input$anio, "`")), data = datos_variable3)
-    
-    # Gráfico con línea de regresión
-    plot(x = datos_variable3[[input$anio]], y = datos_variable3$TOTAL,
-         xlab = paste("Año", input$anio), ylab = "Total", pch = 16,
-         main = paste("Total vs.", input$anio, "para", input$variable3))
-    
-    # Agregar línea de regresión al gráfico
-    abline(modelo, col = "red")
+    if(length(year_cols) > 0 && nrow(datos_variable3) > 0) {
+      years <- as.numeric(year_cols)
+      produccion <- colSums(datos_variable3[, year_cols], na.rm = TRUE)
+      
+      reg_data <- data.frame(Year = years, Produccion = produccion)
+      modelo <- lm(Produccion ~ Year, data = reg_data)
+      
+      plot(x = reg_data$Year, y = reg_data$Produccion,
+           xlab = "Año", ylab = "Producción Total (Cosecha)", pch = 16, col = "blue",
+           main = paste("Tendencia Histórica de Producción para", input$variable3))
+      
+      abline(modelo, col = "red", lwd = 2)
+    }
   })
   
   output$modelo_summary <- renderPrint({
-    # Filtrar los datos para la variable y el año seleccionado
-    datos_variable3 <- Agrodata %>% filter(VARIABLE == input$variable3)
-    resumen_modelo <- obtener_resumen_modelo(datos_variable3, input$anio)
+    datos_variable3 <- Agrodata %>% filter(VARIABLE == input$variable3 & grepl("Producci", PROCESO, ignore.case = TRUE))
+    year_cols <- grep("^\\d{4}$", colnames(datos_variable3), value = TRUE)
     
-    # Mostrar el resumen del modelo lineal
-    return(resumen_modelo)
+    if(length(year_cols) > 0 && nrow(datos_variable3) > 0) {
+      years <- as.numeric(year_cols)
+      produccion <- colSums(datos_variable3[, year_cols], na.rm = TRUE)
+      
+      reg_data <- data.frame(Year = years, Produccion = produccion)
+      modelo <- lm(Produccion ~ Year, data = reg_data)
+      
+      return(summary(modelo))
+    } else {
+      cat("No hay datos suficientes para el análisis.\n")
+    }
   })
   
   output$mensaje_linealidad <- renderText({
-    # Filtrar los datos para la variable y el año seleccionado
-    datos_variable3 <- Agrodata %>% filter(VARIABLE == input$variable3)
+    datos_variable3 <- Agrodata %>% filter(VARIABLE == input$variable3 & grepl("Producci", PROCESO, ignore.case = TRUE))
+    year_cols <- grep("^\\d{4}$", colnames(datos_variable3), value = TRUE)
     
-    # Ajustar el modelo lineal
-    modelo <- lm(as.formula(paste0("TOTAL ~ `", input$anio, "`")), data = datos_variable3)
-    
-    # Calcular el coeficiente de determinación (R cuadrado)
-    r_squared <- summary(modelo)$r.squared
-    
-    # Verificar si el coeficiente de determinación es cercano a 1 (indicando linealidad)
-    if (abs(r_squared - 1) < 0.1) {
-      mensaje_linealidad <- "Los datos presentan linealidad."
-    } else {
-      mensaje_linealidad <- "Los datos no presentan linealidad."
+    if(length(year_cols) > 0 && nrow(datos_variable3) > 0) {
+      years <- as.numeric(year_cols)
+      produccion <- colSums(datos_variable3[, year_cols], na.rm = TRUE)
+      
+      reg_data <- data.frame(Year = years, Produccion = produccion)
+      modelo <- lm(Produccion ~ Year, data = reg_data)
+      
+      p_value <- summary(modelo)$coefficients[2, 4]
+      r_squared <- summary(modelo)$r.squared
+      
+      if (p_value < 0.05) {
+        tendencia <- ifelse(coef(modelo)[2] > 0, "Creciente", "Decreciente")
+        mensaje <- paste("Tendencia Significativa:", tendencia, "en el tiempo con un R² de", round(r_squared, 3))
+      } else {
+        mensaje <- paste("No hay una tendencia lineal significativa en el tiempo (p > 0.05).")
+      }
+      return(mensaje)
     }
-    
-    # Retornar el mensaje
-    return(mensaje_linealidad)
   })
   
 })
