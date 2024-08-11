@@ -4,7 +4,7 @@ Colección de proyectos de análisis estadístico con dashboards interactivos en
 
 ---
 
-## Dashboard 1 — Diagnóstico de Gripe con Naive Bayes
+## Dashboard 1 - Diagnóstico de Gripe con Naive Bayes
 
 Clasifica pacientes en **con gripe** o **salud normal** a partir de signos vitales, usando el algoritmo Naive Bayes (gaussiano y categórico).
 
@@ -21,7 +21,7 @@ Clasifica pacientes en **con gripe** o **salud normal** a partir de signos vital
 
 ---
 
-## Dashboard 2 — Brecha Digital Móvil en Perú 2023
+## Dashboard 2 - Brecha Digital Móvil en Perú 2023
 
 Analiza la cobertura de telefonía móvil en el Perú a nivel de departamento, zona (urbana/rural) y operadora, con datos de OSIPTEL (marzo 2023).
 
@@ -41,7 +41,7 @@ Analiza la cobertura de telefonía móvil en el Perú a nivel de departamento, z
 
 ---
 
-## Dashboard 3 — Análisis Agrícola Agropuno
+## Dashboard 3 - Análisis Agrícola Agropuno
 
 Aplicación web interactiva para el análisis de datos de siembra y producción agrícola en las 13 provincias de la región de Puno (1997 - 2021).
 
