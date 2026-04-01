@@ -47,9 +47,7 @@ AAAA GRIPE/
 
 ```bash
 source venv/Scripts/activate
-```
-
-```bash
+pip install -r requirements.txt
 streamlit run app.py
 ```
 

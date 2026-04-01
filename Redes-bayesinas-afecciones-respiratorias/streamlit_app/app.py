@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import os
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
@@ -12,21 +13,21 @@ st.set_page_config(page_title="Dashboard Gripe - Naive Bayes", layout="wide")
 st.title("Dashboard Diagnóstico de Gripe")
 st.markdown("Análisis de signos vitales y clasificación con **Naive Bayes**")
 
-# ─────────────────────────────────────────────
 # CARGA DE DATOS
-# ─────────────────────────────────────────────
 @st.cache_data
 def cargar_datos():
-    df = pd.read_excel("gripe.xlsx")
+    base_dir = os.path.dirname(__file__)  # ubicación de app.py
+    ruta = os.path.join(base_dir, "gripe.xlsx")  # ruta completa
+
+    df = pd.read_excel(ruta)
     df = df[["temperatura", "frecuencia_cardíaca", "oxigeno", "glicemia", "tensión", "etiqueta"]]
     df.columns = ["T", "F", "O", "G", "E", "S"]
     return df
 
 df_raw = cargar_datos()
 
-# ─────────────────────────────────────────────
 # SIDEBAR - CONTROLES
-# ─────────────────────────────────────────────
+
 st.sidebar.header("Configuración")
 modo = st.sidebar.radio(
     "Modo de datos",
@@ -34,9 +35,7 @@ modo = st.sidebar.radio(
 )
 test_size = st.sidebar.slider("% datos de prueba", 10, 40, 30) / 100
 
-# ─────────────────────────────────────────────
 # PREPROCESAMIENTO
-# ─────────────────────────────────────────────
 @st.cache_data
 def preprocesar(df, limpiar=False):
     df = df.copy()
@@ -69,14 +68,10 @@ def preprocesar(df, limpiar=False):
 limpiar = (modo == "Datos limpios (reemplazar extremos)")
 df = preprocesar(df_raw, limpiar=limpiar)
 
-# ─────────────────────────────────────────────
 # TABS
-# ─────────────────────────────────────────────
 tab1, tab2, tab3, tab4 = st.tabs(["Exploración", "Distribuciones", "Modelo Naive Bayes", "Predicción Manual"])
 
-# ══════════════════════════════════════════════
 # TAB 1: EXPLORACIÓN
-# ══════════════════════════════════════════════
 with tab1:
     st.subheader("Vista General del Dataset")
 
@@ -112,9 +107,7 @@ with tab1:
     )
     st.plotly_chart(fig_bar, use_container_width=True)
 
-# ══════════════════════════════════════════════
 # TAB 2: DISTRIBUCIONES
-# ══════════════════════════════════════════════
 with tab2:
     st.subheader("Distribución de Variables por Estado de Salud")
 
@@ -172,9 +165,7 @@ with tab2:
                      title=f"Distribución: {nombre}")
         cols[i % 3].plotly_chart(fig, use_container_width=True)
 
-# ══════════════════════════════════════════════
 # TAB 3: MODELO NAIVE BAYES
-# ══════════════════════════════════════════════
 with tab3:
     st.subheader("Modelo Naive Bayes - Clasificación")
 
@@ -227,9 +218,7 @@ with tab3:
         })
         st.dataframe(prior_df, use_container_width=True)
 
-# ══════════════════════════════════════════════
 # TAB 4: PREDICCIÓN MANUAL
-# ══════════════════════════════════════════════
 with tab4:
     st.subheader("Predecir Estado de un Nuevo Paciente")
     st.markdown("Ingresa los signos vitales del paciente:")

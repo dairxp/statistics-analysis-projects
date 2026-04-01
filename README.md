@@ -8,4 +8,4 @@ algoritmo Naive Bayes.
 
 ## Referencia Streamlit
 
-Documentacion oficial: https://docs.streamlit.io
+Documentacion oficial: https://redes-bayesinas-afecciones-respiratorias.streamlit.app/
