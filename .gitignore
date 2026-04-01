@@ -1,0 +1,56 @@
+# R cache and history
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+.Renv
+renv/
+renv.lock
+
+# Python environments
+venv/
+env/
+ENV/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Streamlit cache and temporary files
+.streamlit/
+.cache/
+streamlit_app/.cache/
+streamlit_app/.streamlit/
+
+# Jupyter notebooks
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Environment files
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.temp
+*.log
