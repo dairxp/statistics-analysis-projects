@@ -1,0 +1,3 @@
+cd analisis_brecha_digital_peru_2023/streamlit_cobertura
+source venv/Scripts/activate
+streamlit run app.py
