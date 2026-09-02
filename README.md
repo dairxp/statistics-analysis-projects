@@ -53,6 +53,6 @@ Aplicación web interactiva para el análisis de datos de siembra y producción 
 
 **Tecnologías:** R, Shiny, Plotly, dplyr, ggplot2
 
-**Demo:** https://dairxp.shinyapps.io/Agropuno/
+**Demo:** https://ajmaquera.shinyapps.io/Agropuno/
 
 **Fuente de datos:** [Estadística Agraria Informática (Agropuno)](https://www.agropuno.gob.pe/estadistica-agraria-informatica/agricola/)
